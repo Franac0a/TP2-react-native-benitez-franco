@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { useForm } from "../hooks/useForm.js";
+import { TaskItem } from "../components/TaskItem.jsx";
 
 export const TasksPage = ({ onTasksChange, initialFilter = "all" }) => {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState(initialFilter);
+  const [searchQuery, setSearchQuery] = useState("");
   const [toast, setToast] = useState({
     show: false,
     message: "",
@@ -37,7 +39,7 @@ export const TasksPage = ({ onTasksChange, initialFilter = "all" }) => {
       const res = await fetch("http://localhost:3000/api/tasks");
       if (res.ok) {
         const data = await res.json();
-        setTasks(data.tasks || (Array.isArray(data) ? data : []));
+        setTasks(Array.isArray(data) ? data : data.tasks || []);
       } else {
         setTasks([]);
       }
@@ -151,9 +153,18 @@ export const TasksPage = ({ onTasksChange, initialFilter = "all" }) => {
   };
 
   const filteredTasks = tasks.filter((task) => {
-    if (filter === "completed") return task.is_completed;
-    if (filter === "pending") return !task.is_completed;
-    return true;
+    if (filter === "completed" && !task.is_completed) return false;
+    if (filter === "pending" && task.is_completed) return false;
+
+    if (!searchQuery.trim()) {
+      return true;
+    }
+
+    const normalizedSearch = searchQuery.trim().toLowerCase();
+    return (
+      task.title.toLowerCase().includes(normalizedSearch) ||
+      (task.description || "").toLowerCase().includes(normalizedSearch)
+    );
   });
 
   return (
@@ -245,28 +256,44 @@ export const TasksPage = ({ onTasksChange, initialFilter = "all" }) => {
           </section>
 
           <section className="col-lg-8">
-            <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center border-bottom pb-2 mb-4 gap-3">
-              <h2 className="fs-4 fw-semibold text-dark mb-0">Mis Tareas</h2>
+            <div className="border-bottom pb-2 mb-4">
+              <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3">
+                <h2 className="fs-4 fw-semibold text-dark mb-0">Mis Tareas</h2>
 
-              <div className="btn-group shadow-sm">
-                <button
-                  className={`btn btn-sm ${filter === "all" ? "btn-primary" : "btn-outline-primary"}`}
-                  onClick={() => setFilter("all")}
-                >
-                  Todas
-                </button>
-                <button
-                  className={`btn btn-sm ${filter === "completed" ? "btn-success" : "btn-outline-success"}`}
-                  onClick={() => setFilter("completed")}
-                >
-                  Completadas
-                </button>
-                <button
-                  className={`btn btn-sm ${filter === "pending" ? "btn-warning" : "btn-outline-warning"}`}
-                  onClick={() => setFilter("pending")}
-                >
-                  Pendientes
-                </button>
+                <div className="btn-group shadow-sm">
+                  <button
+                    className={`btn btn-sm ${filter === "all" ? "btn-primary" : "btn-outline-primary"}`}
+                    onClick={() => setFilter("all")}
+                  >
+                    Todas
+                  </button>
+                  <button
+                    className={`btn btn-sm ${filter === "completed" ? "btn-success" : "btn-outline-success"}`}
+                    onClick={() => setFilter("completed")}
+                  >
+                    Completadas
+                  </button>
+                  <button
+                    className={`btn btn-sm ${filter === "pending" ? "btn-warning" : "btn-outline-warning"}`}
+                    onClick={() => setFilter("pending")}
+                  >
+                    Pendientes
+                  </button>
+                </div>
+              </div>
+
+              <div className="mb-3">
+                <label htmlFor="searchQuery" className="form-label">
+                  Buscar tareas
+                </label>
+                <input
+                  type="text"
+                  id="searchQuery"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Buscar por título o descripción"
+                  className="form-control"
+                />
               </div>
             </div>
 
@@ -283,56 +310,12 @@ export const TasksPage = ({ onTasksChange, initialFilter = "all" }) => {
             {!loading && filteredTasks.length > 0 && (
               <div className="d-flex flex-column gap-3">
                 {filteredTasks.map((task) => (
-                  <div
+                  <TaskItem
                     key={task.id}
-                    className={`p-3 rounded shadow-sm border-start ${
-                      task.is_completed
-                        ? "border-success opacity-75"
-                        : "border-primary"
-                    }`}
-                  >
-                    <div className="d-flex justify-content-between align-items-start">
-                      <div className="flex-grow-1">
-                        <h3
-                          className={`fs-5 fw-semibold ${
-                            task.is_completed
-                              ? "text-muted text-decoration-line-through"
-                              : "text-dark"
-                          }`}
-                        >
-                          {task.title}
-                        </h3>
-
-                        <p className="text-muted small">{task.description}</p>
-
-                        <span
-                          className={`badge ${
-                            task.is_completed
-                              ? "bg-success bg-opacity-25 text-success"
-                              : "bg-primary bg-opacity-25 text-primary"
-                          }`}
-                        >
-                          {task.is_completed ? "COMPLETADA" : "PENDIENTE"}
-                        </span>
-                      </div>
-
-                      <div className="d-flex gap-2">
-                        <button
-                          onClick={() => handleSelectEdit(task)}
-                          className="btn btn-sm btn-outline-primary"
-                        >
-                          Editar
-                        </button>
-
-                        <button
-                          onClick={() => handleDeleteTask(task.id)}
-                          className="btn btn-sm btn-outline-danger"
-                        >
-                          Eliminar
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                    task={task}
+                    onEdit={handleSelectEdit}
+                    onDelete={handleDeleteTask}
+                  />
                 ))}
               </div>
             )}
